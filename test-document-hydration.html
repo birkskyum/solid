@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" data-hk="0">
+  <head data-hk="0.0">
+    <meta charset="UTF-8" data-hk="0.0.0">
+    <title data-hk="0.0.1">Test Document Hydration</title>
+  </head>
+  <body data-hk="0.1">
+    <div id="root" data-hk="0.1.0">
+      <h1 data-hk="0.1.0.0">Hello World</h1>
+      <p data-hk="0.1.0.1">This should hydrate</p>
+    </div>
+    <script type="module">
+      import { hydrate } from './packages/solid/web/dist/web.js';
+      import { createSignal } from './packages/solid/dist/solid.js';
+
+      function App() {
+        const [count, setCount] = createSignal(0);
+        return (
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <title>Test Document Hydration</title>
+            </head>
+            <body>
+              <div id="root">
+                <h1>Hello World</h1>
+                <p>This should hydrate</p>
+                <button onClick={() => setCount(count() + 1)}>
+                  Clicked {count()} times
+                </button>
+              </div>
+            </body>
+          </html>
+        );
+      }
+
+      console.log('Starting hydration...');
+      try {
+        hydrate(() => App(), document);
+        console.log('Hydration successful!');
+      } catch (error) {
+        console.error('Hydration failed:', error);
+      }
+    </script>
+  </body>
+</html>

@@ -49,6 +49,112 @@ export const hydrate: typeof hydrateCore = (...args) => {
 };
 
 /**
+ * Hydrates a full document including <html>, <head>, and <body> elements.
+ *
+ * This function enables hydrating components that return a complete <html> structure.
+ * It works by hydrating into document.documentElement and using the existing <html>,
+ * <head>, and <body> elements instead of trying to create new ones.
+ *
+ * @param fn - Component function. For full document hydration, the component should return
+ *            the children of <html> (i.e., <head> and <body> elements), not the <html> element itself.
+ * @param options - Optional hydration options (renderId, etc.)
+ *
+ * @example
+ * ```tsx
+ * // Shared component for both server and client
+ * function AppContent() {
+ *   return (
+ *     <>
+ *       <head>
+ *         <title>My App</title>
+ *         <meta charset="UTF-8" />
+ *       </head>
+ *       <body>
+ *         <div id="root">
+ *           <h1>Hello World</h1>
+ *         </div>
+ *       </body>
+ *     </>
+ *   );
+ * }
+ *
+ * // Server-side (wraps in <html>)
+ * function App() {
+ *   return (
+ *     <html lang="en">
+ *       <AppContent />
+ *     </html>
+ *   );
+ * }
+ * const html = renderToString(() => <App />);
+ *
+ * // Client-side (hydrates content into existing <html>)
+ * hydrateDocument(() => <AppContent />);
+ * ```
+ *
+ * Alternatively, if you want to use the same component on both server and client:
+ * ```tsx
+ * // For server-side rendering
+ * const htmlString = renderToString(() => <App />); // Returns full HTML including <html> tags
+ *
+ * // For client-side hydration into existing document
+ * hydrateDocument(() => <App />, { renderId: "app" });
+ * ```
+ */
+export function hydrateDocument(
+  fn: () => any,
+  options?: { renderId?: string; owner?: unknown }
+): () => void {
+  enableHydration();
+
+  // Create a wrapper function that handles <html> element extraction
+  const wrappedFn = () => {
+    const result = fn();
+
+    // If the component returns an <html> element (common when sharing code between server/client),
+    // we need to extract its children since we're hydrating into the existing document.documentElement
+    if (result && typeof result === 'object' && 'type' in result && result.type === 'html') {
+      // Apply attributes from the JSX <html> element to the existing document.documentElement
+      // This ensures attributes like lang, dir, etc. are properly set during hydration
+      if (result.props) {
+        const props = result.props;
+        Object.keys(props).forEach(key => {
+          if (key !== 'children' && key !== 'ref') {
+            const value = props[key];
+            if (value != null) {
+              // Apply the attribute to the existing html element
+              if (key === 'className' || key === 'class') {
+                document.documentElement.className = value;
+              } else if (typeof value === 'boolean') {
+                if (value) {
+                  document.documentElement.setAttribute(key, '');
+                } else {
+                  document.documentElement.removeAttribute(key);
+                }
+              } else {
+                document.documentElement.setAttribute(key, String(value));
+              }
+            }
+          }
+        });
+
+        // Extract and return the children
+        if (props.children) {
+          return props.children;
+        }
+      }
+    }
+
+    return result;
+  };
+
+  // Hydrate directly into the documentElement (<html>)
+  // The component should return the children of <html> (typically <head> and <body>)
+  // or an <html> element (from which we extract the children and apply attributes)
+  return hydrateCore(wrappedFn, document.documentElement, options);
+}
+
+/**
  * Renders components somewhere else in the DOM
  *
  * Useful for inserting modals and tooltips outside of an cropping layout. If no mount point is given, the portal is inserted in document.body; it is wrapped in a `<div>` unless the target is document.head or `isSVG` is true. setting `useShadow` to true places the element in a shadow root to isolate styles.
